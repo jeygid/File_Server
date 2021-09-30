@@ -13,7 +13,7 @@ public class Main {
         try {
 
             String address = "127.0.0.1";
-            int port = 23459;
+            int port = 23499;
 
             Socket socket = new Socket(InetAddress.getByName(address), port);
 
@@ -79,11 +79,12 @@ public class Main {
                         System.out.println("The request was sent.");
                         String deleteFileResponse = input.readUTF();
 
-                        if (deleteFileResponse.equals("200")) {
-                            System.out.println("The response says that the file was successfully deleted!");
-                        } else if (deleteFileResponse.startsWith("404")) {
+                        if (deleteFileResponse.equals("404")) {
                             System.out.println("The response says that the file was not found!");
+                        } else if (deleteFileResponse.startsWith("200")) {
+                            System.out.println("The response says that the file was successfully deleted!");
                         }
+
 
                         break;
 
@@ -99,8 +100,6 @@ public class Main {
             }
 
             socket.close();
-
-
 
         } catch (IOException exception) {
             exception.printStackTrace();
