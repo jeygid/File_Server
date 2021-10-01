@@ -2,12 +2,20 @@ package client;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
+import java.io.File;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.Socket;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Scanner;
 
 public class Main {
+
+    //change if needed
+    public static Path path = Path.of(new File("").getAbsolutePath() +
+            "/File Server/task/src/client/data/");
+
     public static void main(String[] args) {
 
         try {
@@ -24,46 +32,94 @@ public class Main {
             while (!exit) {
 
                 Scanner scanner = new Scanner(System.in);
-                System.out.println("Enter action (1 - get a file, 2 - create a file, 3 - delete a file):");
+                System.out.println("Enter action (1 - get a file, 2 - save a file, 3 - delete a file):");
                 String command = scanner.nextLine();
 
                 switch (command) {
 
                     case "1":
 
-                        System.out.println("Enter filename:");
-                        String getFileName = scanner.nextLine();
+                        String getChoice;
 
-                        output.writeUTF("GET " + getFileName);
+                        while (true) {
 
-                        System.out.println("The request was sent.");
-                        String getFileResponse = input.readUTF();
+                            System.out.println("Do you want to get the file by name or by id (1 - name, 2 - id):");
+                            getChoice = scanner.nextLine();
 
-                        if (getFileResponse.equals("404")) {
-                            System.out.println("The response says that the file was not found!");
-                        } else if (getFileResponse.startsWith("200 ")) {
-                            System.out.println("The content of the file is: "
-                                    + getFileResponse.replace("200 ", ""));
+                            if (getChoice.matches("1|2")) break;
+
                         }
 
+                        if (getChoice.equals("1")) {
+                            System.out.println("Enter name:");
+                            String name = scanner.nextLine();
+                            output.writeUTF("GET BY_NAME " + name);
+                        }
+
+                        if (getChoice.equals("2")) {
+                            System.out.println("Enter id:");
+                            String id = scanner.nextLine();
+                            output.writeUTF("GET BY_ID " + id);
+                        }
+
+                        System.out.println("The request was sent.");
+                        String getFileIdResponse = input.readUTF();
+
+                        if (getFileIdResponse.equals("404")) {
+                            System.out.println("The response says that this file is not found!");
+                            break;
+                        }
+
+                        if (getFileIdResponse.startsWith("200")) {
+
+                            System.out.println("The file was downloaded! Specify a name for it:");
+                            String getFileName = scanner.nextLine();
+
+                            int length = input.readInt();
+                            byte[] message = new byte[length];
+                            input.readFully(message, 0, message.length);
+
+                            Files.write(Path.of(path + "\\" + getFileName), message);
+
+                            System.out.println("File saved on the hard drive!");
+
+                        }
 
                         break;
 
                     case "2":
 
-                        System.out.println("Enter filename:");
-                        String createFileName = scanner.nextLine();
+                        System.out.println("Enter name of the file:");
+                        String saveName = scanner.nextLine();
 
-                        System.out.println("Enter file content:");
-                        String createFileContent = scanner.nextLine();
+                        System.out.println(path + "\\" + saveName);
 
-                        output.writeUTF("PUT " + createFileName + " " + createFileContent);
+                        if (!new File(path + "\\" + saveName).exists()) {
+                            System.out.println("Sorry, the file doesn't exist!");
+                            break;
+                        }
 
-                        String createFileResponse = input.readUTF();
 
-                        if (createFileResponse.equals("200")) {
-                            System.out.println("The response says that file was created!");
-                        } else if (createFileResponse.equals("403")) {
+                        System.out.println("Enter name of the file to be saved on server:");
+                        String serverName = scanner.nextLine();
+
+                        if (serverName.matches("[ ]+") || serverName.equals("")) {
+                            serverName = Generator.generateRandomName();
+                        }
+
+                        output.writeUTF("PUT " + serverName);
+
+                        byte[] message = Files.readAllBytes(new File(path + "\\" + saveName).toPath());
+                        output.writeInt(message.length);
+                        output.write(message);
+
+                        String response = input.readUTF();
+                        System.out.println("The request was sent.");
+
+                        if (response.equals("200")) {
+                            String serverId = input.readUTF();
+                            System.out.println("Response says that file is saved! ID = " + serverId);
+                        } else if (response.equals("403")) {
                             System.out.println("The response says that creating the file was forbidden!");
                         }
 
@@ -71,10 +127,29 @@ public class Main {
 
                     case "3":
 
-                        System.out.println("Enter filename:");
-                        String deleteFileName = scanner.nextLine();
+                        String deleteChoice;
 
-                        output.writeUTF("DELETE " + deleteFileName);
+                        while (true) {
+
+                            System.out.println("Do you want to get the file by name or by id (1 - name, 2 - id):");
+                            deleteChoice = scanner.nextLine();
+
+                            if (deleteChoice.matches("1|2")) break;
+
+                        }
+
+                        if (deleteChoice.equals("1")) {
+                            System.out.println("Enter name:");
+                            String deleteFileName = scanner.nextLine();
+                            output.writeUTF("DELETE BY_NAME " + deleteFileName);
+                        }
+
+
+                        if (deleteChoice.equals("2")) {
+                            System.out.println("Enter id:");
+                            String deleteFileId = scanner.nextLine();
+                            output.writeUTF("DELETE BY_ID " + deleteFileId);
+                        }
 
                         System.out.println("The request was sent.");
                         String deleteFileResponse = input.readUTF();
@@ -95,11 +170,13 @@ public class Main {
                         exit = true;
                     default:
                         break;
+
                 }
+
+                socket.close();
 
             }
 
-            socket.close();
 
         } catch (IOException exception) {
             exception.printStackTrace();

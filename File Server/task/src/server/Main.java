@@ -1,5 +1,7 @@
 package server;
 
+import client.Generator;
+
 import java.io.*;
 import java.net.InetAddress;
 import java.net.ServerSocket;
@@ -7,14 +9,59 @@ import java.net.Socket;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.HashMap;
+import java.util.Map;
 
-public class Main {
+public class Main implements Serializable {
 
-    public static Path path;
+    private static final long serialVersionUID = 1L;
+
+    //change if needed
+    public static Path path = Path.of(new File("").getAbsolutePath() +
+            "/File Server/task/src/server/data/");
+
+    public static Map<String, String> filesByIdMap = new HashMap<>();
+
+    public static void save() {
+
+        try {
+
+            FileOutputStream outputStream = new FileOutputStream("files.db");
+            ObjectOutputStream objectOutputStream = new ObjectOutputStream(outputStream);
+            objectOutputStream.writeObject(filesByIdMap);
+            objectOutputStream.close();
+
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+    }
+
+    public static void load() {
+
+        File db = new File("files.db");
+
+        if (db.exists()) {
+
+            try {
+
+                FileInputStream fileInputStream = new FileInputStream("files.db");
+                ObjectInputStream objectInputStream = new ObjectInputStream(fileInputStream);
+                filesByIdMap = (HashMap<String, String>) objectInputStream.readObject();
+
+                objectInputStream.close();
+                fileInputStream.close();
+
+            } catch (IOException | ClassNotFoundException e) {
+                e.printStackTrace();
+            }
+
+        }
+    }
 
     public static void main(String[] args) {
 
-        path = Path.of(System.getProperty("user.dir"), "src", "server", "data");
+        load();
 
         try {
 
@@ -37,45 +84,77 @@ public class Main {
                 }
 
 
-                if (command.matches("GET [\\S]+")) {
+                if (command.matches("GET (BY_ID|BY_NAME) [\\S]+")) {
 
-                    String fileName = command.replace("GET ", "");
+                    String fileName = "";
+
+                    if (command.startsWith("GET BY_ID")) {
+                        fileName = filesByIdMap.get(command.replace("GET BY_ID ", ""));
+                    }
+
+                    if (command.startsWith("GET BY_NAME")) {
+                        fileName = command.replace("GET BY_NAME ", "");
+                    }
+
 
                     File file = new File(path + "/" + fileName);
 
-                    if (file.exists()) {
-                        String content = new String(Files.readAllBytes(Paths.get(path + "/" + fileName)));
 
-                        output.writeUTF("200 " + content);
+                    if (file.exists()) {
+
+                        byte[] message = Files.readAllBytes(file.toPath());
+                        output.writeUTF("200");
+                        output.writeInt(message.length);
+                        output.write(message);
+
+
                     } else {
                         output.writeUTF("404");
                     }
                 }
 
 
-                if (command.matches("PUT [\\S]+ [\\S ]+")) {
+                if (command.matches("PUT [\\S]+")) {
 
-                    String[] commandArray = command.split(" ");
-                    String fileName = commandArray[1];
-                    String text = command.replaceAll("PUT [\\S]+ ", "");
+                    String fileName = command.replace("PUT ", "");
 
                     File file = new File(path + "/" + fileName);
 
                     if (file.exists()) {
+
                         output.writeUTF("403");
+
                     } else {
-                        FileWriter fileWriter = new FileWriter(path + "/" + fileName);
-                        fileWriter.write(text);
-                        fileWriter.flush();
-                        fileWriter.close();
+
+                        int length = input.readInt();
+                        byte[] message = new byte[length];
+                        input.readFully(message, 0, message.length);
+                        Files.write(Path.of(file.getAbsolutePath()), message);
+
+                        String fileId = Generator.generateId();
+                        filesByIdMap.put(fileId, file.getName());
+                        save();
+
                         output.writeUTF("200");
+                        output.writeUTF(fileId);
+
                     }
                 }
 
 
-                if (command.matches("DELETE [\\S]+")) {
+                if (command.matches("DELETE (BY_ID|BY_NAME) [\\S]+")) {
 
-                    String fileName = command.replace("DELETE ", "");
+                    String fileName = "";
+
+                    if (command.startsWith("DELETE BY_ID")) {
+                        fileName = filesByIdMap.get(command.replace("DELETE BY_ID ", ""));
+                    }
+
+                    if (command.startsWith("DELETE BY_NAME")) {
+                        fileName = command.replace("DELETE BY_NAME ", "");
+
+                    }
+
 
                     File file = new File(path + "/" + fileName);
 
